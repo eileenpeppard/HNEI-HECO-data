@@ -1,0 +1,12 @@
+# Data files (large, not committed to git)
+*.pdf
+*.csv
+*.xlsx
+*.xls
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor / tooling
+.claude/
