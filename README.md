@@ -25,10 +25,11 @@ HNEI-HECO-data\
       heat_rate\  generation_component\  purchased_component\  foac_biodiesel\  res_bill\
                                     <- single-page PDFs + csv_output\ for each page type
     production_data\               <- PUC hourly generation Excel filings
-      reshape_hourly_generation_data.py  reshapes wide-format Excel -> long-format CSV
+      scripts\
+        reshape_hourly_generation_data.py  reshapes wide-format Excel -> long-format CSV
       raw_data\                    <- drop new Excel filings here
-      processed_data\              <- already-processed Excel filings
-      output\                      <- combined_oahu_production_data.csv
+      processed_data\              <- script archives filings here after processing
+      csv_output\                  <- combined_oahu_production_data.csv
 ```
 
 ## Running the Oahu ECRC pipeline
@@ -64,10 +65,13 @@ pass `--no-intermediate` to skip them.
 ## Running the Oahu production_data pipeline
 
 ```
-python oahu/production_data/reshape_hourly_generation_data.py
+python oahu/production_data/scripts/reshape_hourly_generation_data.py
 ```
-Reads every `.xlsx`/`.xls` file in `raw_data\`, reshapes each worksheet from wide to long format,
-and writes the combined result to `output\combined_oahu_production_data.csv`.
+Reads every `.xlsx`/`.xls` file in `raw_data\` (files already archived to `processed_data\` are
+never re-read), reshapes each worksheet from wide to long format, and merges the result into the
+existing `csv_output\combined_oahu_production_data.csv` so prior history is preserved. Files
+picked up from `raw_data\` are then moved into `processed_data\`, so re-running is safe
+(idempotent) — nothing gets double-processed on the next run.
 
 ## Architecture
 

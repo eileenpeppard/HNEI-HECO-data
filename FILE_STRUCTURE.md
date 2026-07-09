@@ -49,12 +49,14 @@ HNEI-HECO-data\
     │       └── csv_output\                 (0)
     │
     └── production_data\                    (13 files — 1 script + data)
-        ├── reshape_hourly_generation_data.py     wide-format Excel -> long-format CSV
+        ├── scripts\
+        │   └── reshape_hourly_generation_data.py  wide-format Excel -> long-format CSV
         ├── raw_data\                        (1 file)    Excel filings awaiting processing
-        │                                                latest: 2026-07-07
+        │                                                latest: 2026-07-07 (archived to
+        │                                                processed_data\ on next run)
         ├── processed_data\                  (11 files)  already-processed Excel filings
         │                                                range: 2025-08 to 2026-06
-        └── output\                          (0 files)   combined_oahu_production_data.csv lands here
+        └── csv_output\                      (1 file)    combined_oahu_production_data.csv
 ```
 
 ## Notes worth knowing
@@ -65,6 +67,3 @@ HNEI-HECO-data\
   script and checking whether the archiving step needs a manual push.
 - **`csv_output\` folders are all empty** — that's expected; they're transient and get
   cleared/overwritten each run per the pipeline design in `README.md`.
-- **`output\` under `production_data\` is empty** — `reshape_hourly_generation_data.py` hasn't
-  been run yet since the move (see the "Outstanding" list in
-  `HNEI-HECO-data_reorg_plan_summary.md`).
