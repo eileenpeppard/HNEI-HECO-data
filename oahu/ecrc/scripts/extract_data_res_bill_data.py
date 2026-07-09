@@ -1,10 +1,9 @@
 """
 Extract rate and charge data from HECO (Oahu) residential bill PDFs
-and append rows to a CSV output file.
+and write rows to a CSV output file.
 
-Reads all *_res_bill.pdf files from INPUT_FOLDER,
-extracts the new (later) date's data, and appends to OUTPUT_FILE.
-If OUTPUT_FILE does not exist, it is created fresh with a header row.
+Reads all *_res_bill.pdf files from INPUT_FOLDER, extracts each one's
+data, and writes OUTPUT_FILE fresh (overwriting any previous run).
 
 v16 changes vs v15:
 - Fixed date parsing for older PDFs that use dashes instead of slashes
@@ -26,7 +25,7 @@ import pdfplumber
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 INPUT_FOLDER = str(Path(__file__).resolve().parent.parent / "res_bill")
-OUTPUT_FILE  = str(Path(__file__).resolve().parent.parent / "res_bill" / "res_bill_history.csv")
+OUTPUT_FILE  = str(Path(__file__).resolve().parent.parent / "res_bill" / "csv_output" / "res_bill_history.csv")
 # ─────────────────────────────────────────────────────────────────────────────
 
 HEADER_ROW = ['date', 'metric', 'rate', 'charge$_@500kwh', 'charge$_@600kwh', 'bill_order']
@@ -225,15 +224,13 @@ def build_rows(parsed):
 
 # ── CSV writer ────────────────────────────────────────────────────────────────
 
-def append_to_csv(all_rows):
+def write_csv(all_rows):
     out = Path(OUTPUT_FILE)
-    write_header = not out.exists()
+    out.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(str(out), 'a', newline='', encoding='utf-8') as f:
+    with open(str(out), 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=HEADER_ROW)
-        if write_header:
-            writer.writeheader()
-            print("  Created new output file with header row.")
+        writer.writeheader()
         writer.writerows(all_rows)
 
 
@@ -269,8 +266,8 @@ def main():
         return
 
     all_rows.sort(key=lambda r: (r['date'], r['bill_order']))
-    append_to_csv(all_rows)
-    print(f"\nDone! {len(all_rows)} rows appended to:\n  {OUTPUT_FILE}")
+    write_csv(all_rows)
+    print(f"\nDone! {len(all_rows)} rows written to:\n  {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

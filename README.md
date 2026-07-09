@@ -19,9 +19,7 @@ HNEI-HECO-data\
         extract_data_heco_ecrc_gen_data.py  Stage 2: generation component page -> CSV
         extract_data_res_bill_data.py    Stage 2: residential bill page -> CSV
         extract_ecrc_foac_data.py        Stage 2: FOAC/biodiesel page -> CSV
-        purchased_1_extract_data.py      Stage 2 (purchased energy, step 1 of 3)
-        purchased_2_combine_csv_files.py Stage 2 (purchased energy, step 2 of 3)
-        purchased_3_process_energy_data.py Stage 2 (purchased energy, step 3 of 3)
+        purchased_pipeline.py            Stage 2: purchased energy (extract + combine + process)
       raw_filings\                 <- drop new filing PDFs here before running Stage 1
       processed_filings\           <- Stage 1 moves fully-extracted filings here
       heat_rate\  generation_component\  purchased_component\  foac_biodiesel\  res_bill\
@@ -55,12 +53,13 @@ python oahu/ecrc/scripts/extract_data_res_bill_data.py
 python oahu/ecrc/scripts/extract_ecrc_foac_data.py
 ```
 
-The purchased energy component requires a 3-step sub-pipeline, run in order:
+The purchased energy component runs as a single pipeline (extract each PDF, combine into a wide
+table, reshape/clean into the final long-format CSV):
 ```
-python oahu/ecrc/scripts/purchased_1_extract_data.py       # one CSV per PDF -> csv_output\
-python oahu/ecrc/scripts/purchased_2_combine_csv_files.py   # -> combined_purchased_data.csv
-python oahu/ecrc/scripts/purchased_3_process_energy_data.py # -> purchased_energy.csv
+python oahu/ecrc/scripts/purchased_pipeline.py               # -> csv_output\purchased_energy.csv
 ```
+Per-PDF and combined-table debug CSVs are written to `csv_output\_intermediate\` along the way;
+pass `--no-intermediate` to skip them.
 
 ## Running the Oahu production_data pipeline
 
