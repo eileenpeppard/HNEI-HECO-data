@@ -26,7 +26,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 INPUT_DIR = Path(__file__).resolve().parent.parent / "heat_rate"
-OUTPUT_CSV = INPUT_DIR / "heat_rate_extracted.csv"
+OUTPUT_CSV = INPUT_DIR / "csv_output" / "heat_rate_extracted.csv"
 
 # Matches lines like "Jan-25  11,055  11,055" or "Dec-24  11,608  11,340"
 ROW_PATTERN = re.compile(
