@@ -5,16 +5,41 @@ and write rows to a CSV output file.
 Reads all *_res_bill.pdf files from INPUT_FOLDER, extracts each one's
 data, and writes OUTPUT_FILE fresh (overwriting any previous run).
 
-v16 changes vs v15:
-- Fixed date parsing for older PDFs that use dashes instead of slashes
-  (e.g. '1-01-15' and '12-01-14') by adding %m-%d-%y and %m-%d-%Y
-  to the parse_date format list.
+v17 changes vs v16 (both bugs confirmed against real pdfplumber output
+on the June and July 2026 filings, not just inferred from text):
+
+1. FIXED table_600 column bug: pdfplumber merges the 600-kWh charge
+   table together with a duplicate copy of the rate table when it
+   extracts this page, giving columns
+       [label, rate_old, rate_new, blank, charge_old, charge_new, diff]
+   v16's extract_charges() always read column index 1, which is
+   correct for the 500-kWh table (a clean 3-column charge-only table)
+   but on the 600-kWh table grabs rate_old instead of the charge. This
+   silently produced wrong charge$_@600kwh values for EVERY filing,
+   not just this month's.
+2. FIXED stale METRICS row order: v16 assumed a "non-fuel energy
+   charge subtotal" row with a numeric value (it's actually just a
+   section header, no value) and had no entries at all for three rows
+   that are present in current filings: "Demand Response Adjustment
+   Clause", "Refund of 2011 Interim", and "Renewable Energy
+   Infrastructure Cost Recovery Provision". Every index past
+   "Customer Charge" was pointing at the wrong row as a result.
+3. Renamed the two non-fuel tier metrics from first_300kwh/next_700kwh
+   to first_350kwh/next_850kwh to match the tier breakpoints actually
+   used in current filings (HECO's tiers changed at some point after
+   v16's naming was set) -- rename back if your Postgres schema
+   expects the old column/value names.
+4. Added a sanity check: each filing is expected to yield exactly 15
+   rate values and 17 charge values (per panel). If pdfplumber returns
+   a different count -- meaning HECO changed the row layout again --
+   the script prints a loud warning instead of silently writing
+   misaligned data, which is what let this bug go unnoticed.
 
 Requirements:
     pip install pdfplumber
 
 Usage:
-    python big_island_2_extract_res_bill_data_v16.py
+    python get_ecrc_res_bill_data_oahu_v17.py
 """
 
 import csv
@@ -30,45 +55,43 @@ OUTPUT_FILE  = str(Path(__file__).resolve().parent.parent / "res_bill" / "csv_ou
 
 HEADER_ROW = ['date', 'metric', 'rate', 'charge$_@500kwh', 'charge$_@600kwh', 'bill_order']
 
-# ── Metric definitions ────────────────────────────────────────────────────────
-# Tuple: (metric_key, bill_order, has_rate, rate_idx_new, charge_idx_new,
-#                                           rate_idx_old, charge_idx_old)
+# ── Metric definitions (verified against real pdfplumber output) ─────────────
+# Tuple: (metric_key, bill_order, has_rate, rate_idx, charge_idx)
 #
-# NEW format (>= 2020, 12 rate values, 15 charge values):
-#   Rates:   base_fuel, first300, next700, customer, interim, rba,
-#            ppa, pbf, dsm, solarsaver, ecr, gif
-#   Charges: base_fuel, nonfuel_subtotal, first300, next700, customer,
-#            total_base, interim, rba, ppa, pbf, dsm, solarsaver, ecr, gif, avg
+# Rates: 15 values in this order (from the rate-only table's row[2][col]):
+#   base_fuel, first350, next850, customer, ppa, rba, dsm,
+#   demand_response, interim, refund_2011, pbf, reic, solarsaver, ecr, gif
 #
-# OLD format (pre-2020, 11 rate values, 14 charge values — no interim row):
-#   Rates:   base_fuel, first300, next700, customer, rba,
-#            ppa, pbf, dsm, solarsaver, ecr, gif
-#   Charges: base_fuel, nonfuel_subtotal, first300, next700, customer,
-#            total_base, rba, ppa, pbf, dsm, solarsaver, ecr, gif, avg
-#
-# None in rate/charge index means the row doesn't exist in that format.
+# Charges: 17 values in this order (flattened rows 2-4 of the 500-kWh
+# table -- there is NO subtotal row, but there IS a total_base_charges
+# row and an avg_res_bill row):
+#   base_fuel, first350, next850, customer, total_base, ppa, rba, dsm,
+#   demand_response, interim, refund_2011, pbf, reic, solarsaver, ecr,
+#   gif, avg_res_bill
 
 METRICS = [
-    # metric_key                                          order  has_rate  r_new c_new  r_old c_old
-    ("base_fuel/energy_charge_cents/kwh",              1,  True,  0,  0,   0,  0),
-    ("non_fuel_energy_charge_subtotal_$",              2,  False, None, 1,  None, 1),
-    ("non_fuel_energy_charge_first_300kwh_cents/kwh",  3,  True,  1,  2,   1,  2),
-    ("non_fuel_energy_charge_next_700kwh_cents/kwh",   4,  True,  2,  3,   2,  3),
-    ("customer_charge_$",                              5,  True,  3,  4,   3,  4),
-    ("total_base_charges_$",                           6,  False, None, 5,  None, 5),
-    ("interim_rate_adjustment_2019ty_%_on_base",       7,  True,  4,  6,   None, None),  # new only
-    ("rba_rate_adjustment_%_except_ecrc",              8,  True,  5,  7,   4,  6),
-    ("purchased_power_adj_clause_cents/kwh",           9,  True,  6,  8,   5,  7),
-    ("pbf_surcharge_cents/kwh",                       10,  True,  7,  9,   6,  8),
-    ("dsm_adjustment_cents/kwh",                      11,  True,  8, 10,   7,  9),
-    ("solarsaver_adjustment_cents/kwh",               12,  True,  9, 11,   8, 10),
-    ("energy_cost_recovery_cents/kwh",                13,  True, 10, 12,   9, 11),
-    ("green_infrastructure_fee_$",                    14,  True, 11, 13,  10, 12),
-    ("avg_res_bill_$",                                15,  False, None, 14, None, 13),
+    # metric_key                                              order  has_rate  rate_idx  charge_idx
+    ("base_fuel/energy_charge_cents/kwh",                   1,  True,   0,   0),
+    ("non_fuel_energy_charge_first_350kwh_cents/kwh",       2,  True,   1,   1),
+    ("non_fuel_energy_charge_next_850kwh_cents/kwh",        3,  True,   2,   2),
+    ("customer_charge_$",                                   4,  True,   3,   3),
+    ("total_base_charges_$",                                5,  False, None,   4),
+    ("demand_response_adjustment_cents/kwh",                6,  True,   4,   5),
+    ("rba_rate_adjustment_%_except_ecrc",                   7,  True,   5,   6),
+    ("dsm_adjustment_cents/kwh",                            8,  True,   6,   7),
+    ("demand_response_adjustment_cents/kwh",                9,  True,   7,   8),
+    ("interim_rate_increase_ty2017_%_on_base",             10,  True,   8,   9),
+    ("refund_of_2011_interim_%_on_base",                   11,  True,   9,  10),
+    ("pbf_surcharge_cents/kwh",                            12,  True,  10,  11),
+    ("renewable_energy_infra_cost_recovery_cents/kwh",     13,  True,  11,  12),
+    ("solarsaver_adjustment_cents/kwh",                    14,  True,  12,  13),
+    ("energy_cost_recovery_cents/kwh",                     15,  True,  13,  14),
+    ("green_infrastructure_fee_$",                         16,  True,  14,  15),
+    ("avg_res_bill_$",                                     17,  False, None,  16),
 ]
 
-N_METRICS    = len(METRICS)
-NEW_RATE_MIN = 12   # >= this many rates → new format
+EXPECTED_RATE_COUNT   = 15
+EXPECTED_CHARGE_COUNT = 17
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,7 +106,7 @@ def nums_from_text(text):
         part = part.strip().replace('$', '').replace('%', '').replace(',', '').replace(' ', '')
         if part in ('', 'None', 'none'):
             continue
-        if re.match(r'\d{1,2}/\d{1,2}/\d{4}', part):
+        if re.match(r'\d{1,2}/\d{1,2}/\d{2,4}$', part):
             continue
         if part == '-':
             results.append(0.0)
@@ -116,15 +139,16 @@ def parse_date(cell_text):
 
 def parse_pdf(pdf_path):
     """
-    Parse one HELCO residential bill PDF.
+    Parse one HECO residential bill PDF (Oahu).
 
-    Handles two formats:
-      NEW (>= ~2020): 12 rate values, 15 charge values — includes Interim row
-      OLD (pre-2020): 11 rate values, 14 charge values — no Interim row
+    pdfplumber's extract_tables() returns 3 tables for this page layout:
+      - a rate-only table (label blob + two rate columns)
+      - a clean 500-kWh charge table (3 columns: charge_old, charge_new, diff)
+      - a MERGED 600-kWh table that also carries a duplicate rate table
+        side-by-side with it (7 columns: label, rate_old, rate_new, blank,
+        charge_old, charge_new, diff)
 
-    Format is auto-detected from the number of rate values extracted.
-
-    Returns dict with keys: date, new_format, rates_raw, charges_500, charges_600
+    Returns dict with keys: date, rates_raw, charges_500, charges_600
     """
     with pdfplumber.open(str(pdf_path)) as pdf:
         page = pdf.pages[0]
@@ -133,7 +157,6 @@ def parse_pdf(pdf_path):
     if not tables:
         raise ValueError(f"No tables found in {pdf_path}")
 
-    # Identify tables by header text
     table_rate = None
     table_500  = None
     table_600  = None
@@ -150,39 +173,43 @@ def parse_pdf(pdf_path):
             table_rate = t
 
     # ── Date: latest date from the 500-table header row ───────────────────────
-    new_date = None
+    bill_date = None
     if table_500 and len(table_500) > 1:
         for cell in table_500[1]:
             d = parse_date(cell)
-            if d and (new_date is None or d > new_date):
-                new_date = d
+            if d and (bill_date is None or d > bill_date):
+                bill_date = d
 
-    # ── Rates: rate-panel row[2], col[2] (new/current rates) ─────────────────
+    # ── Rates: from the dedicated rate table, current-date column ────────────
     rates_raw = []
     if table_rate and len(table_rate) > 2:
         cell = table_rate[2][2] if len(table_rate[2]) > 2 else ''
         rates_raw = nums_from_text(cell)
 
-    # ── Detect format ─────────────────────────────────────────────────────────
-    new_format = len(rates_raw) >= NEW_RATE_MIN
-
-    # ── Charges: flatten all data rows (rows 2+) + avg row, col[1] ───────────
-    def extract_charges(table):
+    # ── Charges: 500-kWh table is clean (col index 1 = current charge) ───────
+    def extract_charges_clean(table, col):
         vals = []
         if not table:
             return vals
         for row in table[2:]:
-            cell = row[1] if len(row) > 1 else None
+            cell = row[col] if len(row) > col else None
             if cell:
                 vals.extend(nums_from_text(cell))
         return vals
 
-    charges_500 = extract_charges(table_500)
-    charges_600 = extract_charges(table_600)
+    charges_500 = extract_charges_clean(table_500, col=1)
+
+    # ── 600-kWh table: detect whether it's merged with the rate table ────────
+    # Clean (charge-only) layout: 3 columns -> current charge is col 1.
+    # Merged layout (rate + charge together): 7 columns -> current charge is col 5.
+    charges_600 = []
+    if table_600:
+        max_cols = max(len(r) for r in table_600)
+        charge_col = 1 if max_cols <= 4 else 5
+        charges_600 = extract_charges_clean(table_600, col=charge_col)
 
     return {
-        'date':        new_date,
-        'new_format':  new_format,
+        'date':        bill_date,
         'rates_raw':   rates_raw,
         'charges_500': charges_500,
         'charges_600': charges_600,
@@ -191,19 +218,26 @@ def parse_pdf(pdf_path):
 
 # ── Build data rows ───────────────────────────────────────────────────────────
 
-def build_rows(parsed):
-    """Map parsed lists to METRICS using the correct format indices."""
+def build_rows(parsed, pdf_name=""):
+    """Map parsed lists to METRICS using the verified index positions."""
     date_str    = parsed['date'].strftime('%m/%d/%Y') if parsed['date'] else ''
-    new_format  = parsed['new_format']
     rates_raw   = parsed['rates_raw']
     charges_500 = parsed['charges_500']
     charges_600 = parsed['charges_600']
 
-    rows = []
-    for metric, order, has_rate, r_new, c_new, r_old, c_old in METRICS:
-        r_idx = r_new if new_format else r_old
-        c_idx = c_new if new_format else c_old
+    if len(rates_raw) != EXPECTED_RATE_COUNT:
+        print(f"  WARNING [{pdf_name}]: expected {EXPECTED_RATE_COUNT} rate values, "
+              f"got {len(rates_raw)}. Row layout may have changed -- check METRICS indices "
+              f"before trusting this file's output.")
+    if len(charges_500) != EXPECTED_CHARGE_COUNT:
+        print(f"  WARNING [{pdf_name}]: expected {EXPECTED_CHARGE_COUNT} charge_500 values, "
+              f"got {len(charges_500)}.")
+    if len(charges_600) != EXPECTED_CHARGE_COUNT:
+        print(f"  WARNING [{pdf_name}]: expected {EXPECTED_CHARGE_COUNT} charge_600 values, "
+              f"got {len(charges_600)}.")
 
+    rows = []
+    for metric, order, has_rate, r_idx, c_idx in METRICS:
         rate = ''
         if has_rate and r_idx is not None and r_idx < len(rates_raw):
             rate = rates_raw[r_idx]
@@ -251,10 +285,9 @@ def main():
         print(f"Processing: {pdf.name}")
         try:
             parsed = parse_pdf(pdf)
-            rows   = build_rows(parsed)
+            rows   = build_rows(parsed, pdf_name=pdf.name)
             date_s = parsed['date'].strftime('%m/%d/%Y') if parsed['date'] else 'unknown'
-            fmt    = "new" if parsed['new_format'] else "old (no interim)"
-            print(f"  Date: {date_s}  |  Format: {fmt}  |  {len(rows)} rows")
+            print(f"  Date: {date_s}  |  {len(rows)} rows")
             all_rows.extend(rows)
         except Exception as e:
             import traceback

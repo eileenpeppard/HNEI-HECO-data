@@ -1,5 +1,5 @@
 """
-purchased_pipeline.py
+get_ecrc_purchased_data_oahu.py
 
 End-to-end pipeline for HECO ECRC "purchased energy component" filings.
 Replaces the old purchased_1 / purchased_2 / purchased_3 scripts with a
@@ -13,8 +13,8 @@ single run:
                        ERC per date), join, and clean.
 
 Usage:
-    python purchased_pipeline.py                  # run all steps
-    python purchased_pipeline.py --no-intermediate # skip writing per-stage debug CSVs
+    python get_ecrc_purchased_data_oahu.py                  # run all steps
+    python get_ecrc_purchased_data_oahu.py --no-intermediate # skip writing per-stage debug CSVs
 
 Intermediate CSVs (one per PDF, plus the combined wide table) are written to
 csv_output/_intermediate/ for debugging a specific filing or date column.

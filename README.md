@@ -15,11 +15,11 @@ HNEI-HECO-data\
     ecrc\                          <- HECO ECRC PDF filing pipeline
       scripts\
         extract_ecrc_pages_oahu.py       Stage 1: splits raw filings into single-page PDFs
-        extract_ecrc_data_heat_rate.py   Stage 2: heat rate page -> CSV
-        extract_data_heco_ecrc_gen_data.py  Stage 2: generation component page -> CSV
-        extract_data_res_bill_data.py    Stage 2: residential bill page -> CSV
-        extract_ecrc_foac_data.py        Stage 2: FOAC/biodiesel page -> CSV
-        purchased_pipeline.py            Stage 2: purchased energy (extract + combine + process)
+        get_ecrc_heat_rate_data_oahu.py  Stage 2: heat rate page -> CSV
+        get_ecrc_gen_data_oahu.py        Stage 2: generation component page -> CSV
+        get_ecrc_res_bill_data_oahu.py   Stage 2: residential bill page -> CSV
+        get_ecrc_foac_data_oahu.py       Stage 2: FOAC/biodiesel page -> CSV
+        get_ecrc_purchased_data_oahu.py  Stage 2: purchased energy (extract + combine + process)
       raw_filings\                 <- drop new filing PDFs here before running Stage 1
       processed_filings\           <- Stage 1 moves fully-extracted filings here
       heat_rate\  generation_component\  purchased_component\  foac_biodiesel\  res_bill\
@@ -48,16 +48,16 @@ moves completed filings to `processed_filings\`. Safe to re-run (idempotent).
 
 Step 2 — extract data from the single-page PDFs, run each independently after Step 1:
 ```
-python oahu/ecrc/scripts/extract_ecrc_data_heat_rate.py
-python oahu/ecrc/scripts/extract_data_heco_ecrc_gen_data.py
-python oahu/ecrc/scripts/extract_data_res_bill_data.py
-python oahu/ecrc/scripts/extract_ecrc_foac_data.py
+python oahu/ecrc/scripts/get_ecrc_heat_rate_data_oahu.py
+python oahu/ecrc/scripts/get_ecrc_gen_data_oahu.py
+python oahu/ecrc/scripts/get_ecrc_res_bill_data_oahu.py
+python oahu/ecrc/scripts/get_ecrc_foac_data_oahu.py
 ```
 
 The purchased energy component runs as a single pipeline (extract each PDF, combine into a wide
 table, reshape/clean into the final long-format CSV):
 ```
-python oahu/ecrc/scripts/purchased_pipeline.py               # -> csv_output\purchased_energy.csv
+python oahu/ecrc/scripts/get_ecrc_purchased_data_oahu.py     # -> csv_output\purchased_energy.csv
 ```
 Per-PDF and combined-table debug CSVs are written to `csv_output\_intermediate\` along the way;
 pass `--no-intermediate` to skip them.

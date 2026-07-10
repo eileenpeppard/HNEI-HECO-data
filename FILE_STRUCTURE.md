@@ -13,11 +13,11 @@ HNEI-HECO-data\
 └── oahu\
     ├── ecrc\                               (360 files — 6 scripts + data)
     │   ├── extract_ecrc_pages_oahu.py           Stage 1: splits raw filings into 5 single-page PDFs
-    │   ├── extract_ecrc_data_heat_rate.py        Stage 2: heat_rate -> CSV
-    │   ├── extract_data_heco_ecrc_gen_data.py     Stage 2: generation_component -> CSV
-    │   ├── extract_data_res_bill_data.py          Stage 2: res_bill -> CSV
-    │   ├── extract_ecrc_foac_data.py              Stage 2: foac_biodiesel -> CSV
-    │   ├── purchased_pipeline.py                  Stage 2: purchased energy (extract + combine + process)
+    │   ├── get_ecrc_heat_rate_data_oahu.py        Stage 2: heat_rate -> CSV
+    │   ├── get_ecrc_gen_data_oahu.py               Stage 2: generation_component -> CSV
+    │   ├── get_ecrc_res_bill_data_oahu.py          Stage 2: res_bill -> CSV
+    │   ├── get_ecrc_foac_data_oahu.py              Stage 2: foac_biodiesel -> CSV
+    │   ├── get_ecrc_purchased_data_oahu.py         Stage 2: purchased energy (extract + combine + process)
     │   │
     │   ├── raw_filings\                    (1 file)    full ECRC filings awaiting Stage 1
     │   │                                                latest: oahu_ecrc_2026_07.pdf
