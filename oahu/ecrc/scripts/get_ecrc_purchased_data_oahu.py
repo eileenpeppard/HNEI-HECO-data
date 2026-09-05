@@ -35,7 +35,7 @@ import pandas as pd
 # PATHS
 # -------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent / "purchased_component"
-TEMPLATE_FILE = BASE_DIR / "template_purchased.csv"
+TEMPLATE_FILE = BASE_DIR / "Template_purchased.csv"
 ERC_LIST_CSV = BASE_DIR / "erc_list.csv"
 OUTPUT_DIR = BASE_DIR / "csv_output"
 INTERMEDIATE_DIR = OUTPUT_DIR / "_intermediate"

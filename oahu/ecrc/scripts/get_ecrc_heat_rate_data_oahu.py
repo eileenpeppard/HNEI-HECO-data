@@ -2,7 +2,9 @@
 extract_heat_rate.py
 
 Extracts monthly recorded heat rate data from Hawaiian Electric ECRC heat rate PDFs.
-Outputs a list of (date, monthly_recorded_heat_rate_btu_kwh_sales) rows.
+Each filing's page reprints the full recorded-data history, so only the latest
+(newest) month is taken from each PDF; that row is merged into the existing
+output CSV so prior history is preserved across runs.
 
 Usage:
     python extract_heat_rate.py                          # processes all PDFs in INPUT_DIR
@@ -75,13 +77,35 @@ def extract_from_text(text: str) -> list[tuple[date, int]]:
 
 
 def extract_from_pdf(pdf_path: Path) -> list[tuple[date, int]]:
-    """Open a PDF and extract heat rate rows from all pages."""
+    """Open a PDF and extract only the most recent heat rate row.
+
+    Each filing's page reprints the full recorded-data history, so only the
+    latest month (the new data this filing actually adds) is kept.
+    """
     rows = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text = page.extract_text() or ""
             rows.extend(extract_from_text(text))
-    return rows
+    if not rows:
+        return []
+    return [max(rows, key=lambda row: row[0])]
+
+
+def load_existing(output_path: Path) -> dict[date, int]:
+    """Load previously extracted rows so new runs merge with prior history."""
+    seen: dict[date, int] = {}
+    if not output_path.exists():
+        return seen
+    with open(output_path, newline="") as f:
+        reader = csv.reader(f)
+        next(reader, None)  # header
+        for row in reader:
+            if not row:
+                continue
+            obs_date = date.fromisoformat(row[0])
+            seen[obs_date] = int(row[1])
+    return seen
 
 
 def process_files(pdf_paths: list[Path], output_path: Path) -> None:
@@ -97,8 +121,8 @@ def process_files(pdf_paths: list[Path], output_path: Path) -> None:
         print("No data extracted. Check that the PDFs match the expected format.")
         return
 
-    # Deduplicate (keep last seen) and sort by date
-    seen: dict[date, int] = {}
+    # Merge with existing output (if any), then dedupe (keep last seen) and sort
+    seen = load_existing(output_path)
     for obs_date, value in all_rows:
         seen[obs_date] = value
     sorted_rows = sorted(seen.items())
