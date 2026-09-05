@@ -76,7 +76,7 @@ METRICS = [
     ("non_fuel_energy_charge_next_850kwh_cents/kwh",        3,  True,   2,   2),
     ("customer_charge_$",                                   4,  True,   3,   3),
     ("total_base_charges_$",                                5,  False, None,   4),
-    ("demand_response_adjustment_cents/kwh",                6,  True,   4,   5),
+    ("purchased_power_adjustment_cents/kwh",                6,  True,   4,   5),
     ("rba_rate_adjustment_%_except_ecrc",                   7,  True,   5,   6),
     ("dsm_adjustment_cents/kwh",                            8,  True,   6,   7),
     ("demand_response_adjustment_cents/kwh",                9,  True,   7,   8),
