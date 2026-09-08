@@ -16,8 +16,9 @@ def process_excel_file(file_path):
 
     all_sheets = []
 
-    # Use a context manager so the file handle is released before we try to
-    # archive (move) the file later — otherwise Windows keeps it locked.
+    # Use a context manager so the file handle is released promptly — the file
+    # still needs to be renamed later, by upload_oahu_production.py, and
+    # Windows keeps an open file locked.
     with pd.ExcelFile(file_path) as xl:
         sheet_names = xl.sheet_names
         print(f"  - Found {len(sheet_names)} worksheet(s): {sheet_names}")
@@ -136,25 +137,10 @@ def process_new_files(raw_directory, output_file):
     return combined_df, processed_paths
 
 
-def archive_processed_files(processed_paths, processed_dir):
-    """Move newly-processed files out of raw_data and into processed_data."""
-    if not processed_paths:
-        return
-
-    processed_dir.mkdir(parents=True, exist_ok=True)
-    for path in processed_paths:
-        dest = processed_dir / path.name
-        path.rename(dest)
-        print(f"  Archived: {path.name} -> processed_data\\")
-
-    print(f"\nArchived {len(processed_paths)} newly-processed file(s) to processed_data\\")
-
-
 # ── Main execution ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     BASE_DIR      = Path(__file__).resolve().parent.parent
     RAW_DIR       = BASE_DIR / "raw_data"
-    PROCESSED_DIR = BASE_DIR / "processed_data"
     OUTPUT_FILE   = BASE_DIR / "csv_output" / "combined_oahu_production_data.csv"
 
     print("=" * 70)
@@ -169,4 +155,7 @@ if __name__ == "__main__":
         print("\nLast 10 rows of combined data:")
         print(result.tail(10))
 
-        archive_processed_files(processed_paths, PROCESSED_DIR)
+        print(
+            "\nRaw files remain in raw_data\\ until upload_oahu_production.py "
+            "confirms they're loaded into the database."
+        )
