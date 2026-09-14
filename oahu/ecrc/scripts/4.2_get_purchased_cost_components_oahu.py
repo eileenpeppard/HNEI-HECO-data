@@ -91,9 +91,16 @@ def normalize_decimal_spacing(line: str) -> str:
 
 
 def extract_effective_date(text: str) -> str | None:
-    """Extracts 'Effective Date - September 1, 2025' -> '2025-09-01'."""
+    """Extracts 'Effective Date - September 1, 2025' -> '2025-09-01'.
+
+    Some older filings (2023 through 2024-01) wrap the line, putting
+    "Effective Date" alone on one line and the value on the next, prefixed
+    by that row's line number (e.g. "Effective Date\n1 -January 1, 2023").
+    The \\s*\\d*\\s* between "Date" and "-" absorbs both the line break and
+    that leading line number so one pattern covers both layouts.
+    """
     pat = re.compile(
-        r"Effective\s+Date\s*-\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
+        r"Effective\s+Date\s*\d*\s*-\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
         re.IGNORECASE,
     )
     m = pat.search(text)
